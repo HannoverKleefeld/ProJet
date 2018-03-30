@@ -38,26 +38,12 @@ class rgb {
 }
 
 class ProJet extends IPSModule {
+	private $mode = '';
 	function Create(){
 		parent::Create();
  		$this->registerPropertyInteger('DeviceID',144);
  		$this->registerPropertyInteger('Mode',0);
  		$this->registerPropertyInteger('DimSpeed',0);
-//  		$this->SetBuffer('SavedState','');
-// 		$this->registerPropertyBoolean('EnableEvents',false);
-// // 		$this->registerPropertyBoolean('HasEvents',false);
-// 		$this->registerPropertyString('File','');
-// 		$this->registerPropertyInteger('Groups',0);
-// 		$this->registerPropertyString('Info','');
-// 		$this->registerPropertyString('RemoteUser','');
-// 		$this->registerPropertyString('RemotePass','');
-// 		$this->registerPropertyInteger('UpdateInterval',0);
-// 		$this->RegisterTimer("UpdateTimer", 0, "IPS_RequestAction($this->InstanceID,'UpdateTimer','');");
-// 		$this->RegisterTimer("EventTimer",  0, "IPS_RequestAction($this->InstanceID,'EventsTimer','');");
-// 		$this->SetBuffer(self::buffer_eventids_name,'[]');
-// 		$this->SetBuffer(self::buffer_client_name,'[]');
-// 		$this->SetBuffer('RegisteredClientProps','0');
-// 		$this->SetBuffer('EventRefreshInterval',0);
 	}
 	function ApplyChanges(){
 		parent::ApplyChanges();
@@ -93,10 +79,6 @@ class ProJet extends IPSModule {
 	}
  	function ReceiveData($JSONString){
  		$this->SendDebug(__FUNCTION__,'Message::'.$JSONString,0);
-// 		$data = json_decode($JSONString);
-// 		$data->DataID = "{165092DF-CONT-4980-XB00-20171212XLIB}";
-// 		if(empty($data->Buffer))return;
-// 		//$this->SendDataToChildren(json_encode($data));
  	}	 
 	protected function enableAction($action){
 		if(!is_array($action))
@@ -115,7 +97,8 @@ class ProJet extends IPSModule {
  	}
 	
  	public function SetColor(int  $Color){
-  		if($this->GetValue('COLOR')==$Color) return;
+  		if(($oldColor=$this->GetValue('COLOR'))==$Color) return;
+  		if($Color==0 && $oldColor)$this->SetBuffer('OnColor',$oldColor);
   		$rgb=rgb::fromInt($Color);
  		if($dimSpeed=$this->ReadPropertyInteger('DimSpeed'))
 			return $this->DimRGBW($rgb[RGB_RED], $dimSpeed, $rgb[RGB_GREEN], $dimSpeed, $rgb[RGB_BLUE], $dimSpeed, intval($this->getValue('WHITE')), $dimSpeed);	
@@ -124,8 +107,9 @@ class ProJet extends IPSModule {
  	public function SetLevel(int $DimLevel){
  		if($DimLevel>100)$DimLevel=100;elseif($DimLevel<0)$DimLevel=0;
   		if($this->GetValue('LEVEL')==$DimLevel) return true;
- 		$rgb=rgb::fromInt($this->getValue('COLOR'));
+ 		$rgb=rgb::fromInt($color=$this->getValue('COLOR'));
  		if(!rgb::setLevel($rgb, $DimLevel))return true;
+ 		if($color)$this->SetBuffer('OnColor', $color);
  		if($dimSpeed=$this->ReadPropertyInteger('DimSpeed'))
 			return $this->DimRGBW($rgb[RGB_RED], $dimSpeed, $rgb[RGB_GREEN], $dimSpeed, $rgb[RGB_BLUE], $dimSpeed, intval($this->getValue('WHITE')), $dimSpeed);	
 		return $this->SetRGBW($rgb[RGB_RED], $rgb[RGB_GREEN], $rgb[RGB_BLUE], intval($this->getValue('WHITE')));	
@@ -151,7 +135,7 @@ class ProJet extends IPSModule {
 		return (($level=$this->getValue('LEVEL'))<100) ? $this->SetLevel($level+5):true;
  	}
  	public function DimDown(){
-		return (($level=$this->getValue('LEVEL'))>0) ? $this->SetLevel($level-5):true;
+ 		return (($level=$this->getValue('LEVEL'))>0) ? $this->SetLevel($level-5):true;
  	}
 	public function RunProgram(int $Programm){
 		if($ok=$this->_forwardData(['F',$Programm])){
@@ -163,7 +147,7 @@ class ProJet extends IPSModule {
  		$this->setValue('COLOR', rgb::toInt($r, $g, $b));
  		$this->setValue('LEVEL', $level=round(max($r,$g,$b)/2.55));
  		$this->SetValue('STATE', $level!=0);
-	}
+ 	}
 	private function _downState(){
 		$this->SetBuffer('OnColor',$this->getValue('COLOR'));
 		$this->SetRGBW(0, 0, 0, 0);
